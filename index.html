@@ -2,7 +2,7 @@
 <html>
 	<head>
 		<meta charset="utf-8" />
-		<title>mongo-hadoopで始める大規模ログ解析 〜低コストへの新たな道〜</title>
+		<title>オレオレMultipleInputを作る方法</title>
     <link href="./deck.js/core/deck.core.css" type="text/css" rel="stylesheet" media="Screen,projection" />
 
 
@@ -26,13 +26,12 @@
 		<article class="deck-container">
 			<section class="slide">
 				<h1 style="text-align:left; font-size: 3.0em">
-					mongo-hadoopで始める大規模ログ解析<br />〜低コストへの新たな道〜<br />
-					BigData Analysis with mongo-hadoop
+					オレオレMultipleInputを作る方法
 				</h1>
 				<h3>
-					MongoDB Tokyo 2012<br />January 18th Tokyo, Japan
+					Hadoopソースコードリーディング 第8回<br />February 8th Tokyo, Japan
 				</h3>
-				<h3 style="font-size: 2em; text-align: right; margin-top:600px;">Daichi Morifuji/muddydixon<br>ニフティ株式会社/NIFTY</h3>
+				<h3 style="font-size: 2em; text-align: right; margin-top:600px;">muddydixon</h3>
 			</section>
 
 			<section class="slide">
@@ -55,329 +54,36 @@
 					<li>データマイニング部門(←<span class="red">NEW 部門ができたよ！</span>)</li>
 				</ul>
 			</section>
-			
-			<section class="slide">
-				<h1>ログの解析好きですか？<br>ログの解析していますか？</h1>
-			</section>
-			
-			<section class="slide">
-				<h1>正直、大企業じゃないときついっす</h1>
-			</section>
-			
-			<section class="slide">
-				<h1>リソース・知識も無いし</h1>
-			</section>
-			
-			<section class="slide">
-				<h1><s>@doryokujin さんがどうかしてる</s><br>「#doryokujinnero」なんてタグが生まれるくらいじゃないと厳しい</h1>
-			</section>
-			
-			<section class="slide">
-				<h1>一般人が「#...nero」とか<br>tag付けられない範囲で<br>ログを解析したりする<br>システムを頑張ってみた！</h1>
-			</section>
-			
-			<section class="slide">
-				<h1>Requeirements</h1>
-			</section>
-			
-			<section class="slide">
-				<h2>Functional Requeirements</h2>
-				<ul>
-					<li>Ad hoc query for <span class="red">API</span></li>
-					<li>OLAP for <span class="red">survay</span></li>
-					<li>Distributed Processing <span class="red">bigdata analysis</span></li>
-				</ul>
-			</section>
-			
-			<section class="slide">
-				<h2>Non-Functional Requeirements</h2>
-				<ul>
-					<li>Easily Works for <span class="red">non-big company</span></li>
-					<li>Easy maintenance to some degree for <span class="red">non-experts</span></li>
-					<li>Not Data loss for <span class="red">non-holiday works</span></li>
-				</ul>
-			</section>
-			
-			<section class="slide">
-				<h1>All for <br> <span class="red">healthy sleeping</span></h1>
-			</section>
-			
-			<section class="slide">
-				<h2>Contents</h2>
-				<ol>
-					<li>MongoDB</li>
-					<li>Hadoop</li>
-					<li>mongo-hadoop</li>
-					<li>Advance</li>
-					<li>Conclusion</li>
-				</ol>
-			</section>
-			
-			<section class="slide">
-				<h2>MongoDB</h2>
-				<h3>Cons</h3>
-				<ul>
-					<li>OOM occurs in Map/Reduce</li>
-					<li>Rich Resources (memory / disc)</li>
-				</ul>
-				<h3>Pros</h3>
-				<ul>
-					<li>Schemaless</li>
-					<li>Full Index</li>
-					<li>Replication & High Availability</li>
-					<li>Auto Sharding</li>
-				</ul>
-			</section>
-			
-			<section class="slide">
-				<h2>Hadoop</h2>
-				<h3>Cons</h3>
-				<ul>
-					<li>Difficulty in Operation / Tuning</li>
-					<li>Many Daemons</li>
-					<li>HBase needs more Daemons</li>
-					<li>hive spends much time</li>
-				</ul>
-				<h3>Pros</h3>
-				<ul>
-					<li>Scaleout</li>
-					<li>Calculate Large Data by Map/Reduce</li>
-					<li>Scalable FileSystem (HDFS) supported</li>
-				</ul>
-			</section>
-			
-			<section class="slide">
-				<h2>Requeirements again</h2>
-				<ul>
-					<li>Ad hoc query for <span class="red">API</span></li>
-					<li>OLAP for <span class="red">survay</span></li>
-					<li>Distributed Processing <span class="red">bigdata analysis</span></li>
-					<li>Easily Works for <span class="red">non-big company</span></li>
-					<li>Easy maintenance to some degree for <span class="red">non-experts</span></li>
-					<li>Not Data loss for <span class="red">non-holiday works</span></li>
-				</ul>
-			</section>
-			
-			<section class="slide">
-				<h2>and we want</h2>
-				<ul>
-					<li>Calculate Large Data Easily (No OOM Killer)</li>
-					<li>No more Daemons</li>
-					<li>No more non-"Healthy" State</li>
-				</ul>
-			</section>
 
 			<section class="slide">
-				<h2>Cons. in MongoDB vs. Hadoop</h2>
-				<h3>MongoDB</h3>
+				<h2>コンテンツ</h2>
 				<ul>
-					<li>Difficulty in Calculating Large Data</li>
-				</ul>
-				<h3>Hadoop</h3>
-				<ul>
-					<li>Too much Daemons</li>
-					<li>Often not "Healthy" warning</li>
-					<li>Cannot Find data in a moment (HBase is too difficalt to operate)</li>
+					<li>Delegateの時のmapReduce</li>
 				</ul>
 			</section>
 			
 			<section class="slide">
-				<h1>mongo-hadoop</h1>
-			</section>
-			<section class="slide">
-				<h2><a href="https://github.com/mongodb/mongo-hadoop">mongo-hadoop</a></h2>
-				<h3>What?</h3>
-				<p>mongo-hadoop is Adapter. It enables Hadoop to access MongoDB data.</p>
-				<p>mongo-hadoop supports shards and chunks enviromnent</p>
-				<img src="./images/mongo-hadoop.png">
-			</section>
-
-			<section class="slide">
-				<h2>Sample</h2>
-				<h3>Driver</h3>
-				<pre class="sh_java">MongoConfigUtil.setInputURI( conf, "mongodb://localhost/test.in" ); // set input host, db, collection
-MongoConfigUtil.setOutputURI( conf, "mongodb://localhost/test.out" ); // set output host, db, collection</pre>
-				<h3>Mapper</h3>
-				<pre class="sh_java">        public void map( Object key, BSONObject value, Context context ) throws IOException, InterruptedException{
-            if ( !didStart ){
-                log.info( "map starting, config: " + context.getConfiguration() );
-                didStart = true;
-            }
-
-            //            System.out.println( "key: " + key );
-            //            System.out.println( "value: " + value );
-
-            String str = value.get( "line" ).toString();
-            if ( str != null ){
-                final StringTokenizer itr = new StringTokenizer( str );
-                while ( itr.hasMoreTokens() ){
-                    word.set( itr.nextToken() );
-                    context.write( word, one );
-                }
-            }
-        }
-    }</pre>
-			</section>
-			
-			<section class="slide">
-				<h2>we gotta in mongo-hadoop</h2>
-				<h3><s>MongoDB</s> Hadoop</h3>
+				<h2>Delegateの時のmapReduce (1) 準備</h2>
+				<p>Driver内で下記をセット</p>
 				<ul>
-					<li><s>not</s> Easy Calculate Large Data</li>
-				</ul>
-				<h3><s>Hadoop</s> MongoDB</h3>
-				<ul>
-					<li><s>Too much</s> Limited Daemons</li>
-					<li><s>Often not "Healthy" warning</s> Replica set and sharding</li>
-					<li><s>Cannot</s> Can Find data in a moment <s>(HBase is too difficalt to operate)</s></li>
+					<li>job.setMapperClass(DelegatingMapper.class)</li>
+					<li>job.setInputFormatClass(DelegatingInputFormat.class)</li>
 				</ul>
 			</section>
 			
 			<section class="slide">
-				<h1>Advance</h1>
-			</section>
-			
-			<section class="slide">
-				<h1>Hadongo</h1>
-			</section>
-
-			<section class="slide">
-				<h2>Features</h2>
+				<h2>Delegateの時のmapReduce (2) 起動</h2>
+				<p>MapTask内でmapperとしてDelegatingMapper.classが呼ばれる
 				<ul>
-					<li>use BSONWritable</li>
-					<li>use Common Mapper</li>
-					<li>use Reducer class for Combinator</li>
-					<li>merge multipleInputResources (now pull requesting)</li>
-				</ul>
-			</section>
-			
-			<section class="slide">
-				<h2>use BSONWritable</h2>
-				<ul>
-					<li>BSONWritable is used as elements of Map/Reduce in Hadongo
-						<ul style="font-size: 1em">
-							<li>Mapper&lt;Object, BSONObject, BSONWritable, BSONWritable&gt;</li>
-							<li>Reducer&lt;BSONWritable, BSONWritable, BSONWritable, BSONWritable&gt;</li>
-						</ul>
-					</li>
-					<li>using BSON means below:
-						<ul style="font-size: 1em">
-							<li>We <span class="red">can use</span> "schemeless objects" consisted of String, Number, Boolean, Object, List</li>
-							<li>We <span class="red">should handle</span> them such as check existence, type validation.</li>
-						</ul>
-					</li>
-				</ul>
-			</section>
-			
-			<section class="slide">
-				<h2>use Common Mapper</h2>
-				<ul>
-					<li>In hadoop: <p style="font-size: 1em">we create Mappers/Reducers <span class="red">for distinct Data Resouces. </span></p></li>
-					<li>In hadongo: <p style="font-size: 1em">we create common Mappers/Reducers <span class="red">for distinct Processing Logics</span> and use it to analyze many valiations.</p></li>
-				</ul>
-				<p class="note">Note: check type and existance of target values your own self.</p>
-			</section>
-			
-			<section class="slide">
-				<h2>use Reducer class for Combinator</h2>
-				<ul>
-					<li>use BSONWritable in
-						<ul style="font-size: 1em">
-							<li>Mapper output&lt;BSONWritable key, BSONWritable val&gt;</li>
-							<li>Reducer input&lt;BSONWritable key, BSONWritable val&gt;</li>
-							<li>Reducer output&lt;BSONWritable key, BSONWritable val&gt;</li>
-						</ul>
-					</li>
-					<li>Therefore Reducer is used for <span class="red">Combinator Class</span></li>
-					<li>And finally reducing processing <span class="red">is distributed in Many Mapper Processes</span></li>
-				</ul>
-			</section>
-			
-			<section class="slide">
-				<h2>merge multipleInputResources (now pull requesting)</h2>
-				<ul>
-					<li>in MongoDB: cannot merge multiple input resouces (collection)</li>
-					<li>in practice: the case when <i>Logs</i> and <i>Users</i> are merged is asked</li>
-				</ul>
-				<pre class="sh_java">hadoop jar hadongo.jar com.nifty.hadongo.MergeDriver
-          -jobname mergeTest
-          -in '[{ns:"localhost:27017/multiple.in1", map:"com.nifty.hadongo.mapred.MergeMapper1"},
-                {ns: "localhost:27017/multiple.in2", query: {ts: {"$gt": 1293807600000}, {"$lt": 1294326000000}},
-                 map: "com.nifty.hadongo.mapred.MultipleMapper2"},
-                {ns: "localhost:27017/multiple.in3", map: "com.nifty.hadongo.mapred.MultipleMapper3"}]'
-          -reducer com.nifty.hadongo.mapred.MergeReducer
-          -out localhost:27017/multiple.mergeout</pre>
-				<p>plz merge @rit (@10gen) !!</p>
-			</section>
-			
-			<section class="slide">
-				<h2>hadongo (not public)</h2>
-				<p>
-					Using hadongo library, we can summarize like that
-				</p>
-				<pre classs="sh_sh">hadoop jar hodongo com.nifty.hadongo.HadongoDriver
-					-in localhost:27017/logs.accessLogs
-					-out localhost:27017/summarize.userAgents
-					-mapper com.nifty.hadongo.mapred.CountMapper
-					-reducer com.nifty.hadongo.mapred.CountReducer
-					-key '{"ua": []}'  // the key is translated in each iteration for target Document
-					-query '{ts: {"$gt": 1293807600000}, {"$lt": 1294326000000}}'
-					-fields '{ua: 1}'</pre>
-				<p>You can do it for nested keys
-				<pre classs="sh_sh">hadoop jar hodongo com.nifty.hadongo.HadongoDriver
-					-in localhost:27017/logs.searchLogs
-					-out localhost:27017/summarize.searchWordRankings
-					-mapper com.nifty.hadongo.mapred.CountMapper
-					-reducer com.nifty.hadongo.mapred.CountReducer
-					-key '{"spec.query": []}'
-					-query '{ts: {"$gt": 1293807600000}, {"$lt": 1294326000000}}'
-					-fields '{"spec.query": 1}'</pre>
-			</section>
-			
-			<section class="slide">
-				<h1>Hadongo releases us <br>to develop Mapper/Reducer <br>for each summarizing Job.</h1>
-			</section>
-			
-			<section class="slide">
-				<h1>Only change options!</h1>
-			</section>
-			
-			<section class="slide">
-				<h2>Conclusion</h2>
-				<ul>
-					<li>Ad hoc query for <span class="red">API</span> via MongoDB</li>
-					<li>OLAP for <span class="red">survay</span> via MongoDB</li>
-					<li>Distributed Processing <span class="red">bigdata analysis</span> via Hadoop</li>
-					<li>Easily Works for <span class="red">non-big company</span> via MongoDB</li>
-					<li>Easy maintenance to some degree for <span class="red">non-experts</span> via MongoDB</li>
-					<li>Not Data loss for <span class="red">non-holiday works</span> via MongoDB</li>
-				</ul>
-			</section>
-			
-			<section class="slide">
-				<h1>All for <br> <span class="red">healthy sleeping</span></h1>
-			</section>
-			
-			<section class="slide">
-				<h1>Future works</h1>
-			</section>
-			
-			<section class="slide">
-				<h2>Future works</h2>
-				<ul>
-					<li>simplify BSONDecoder Class</li>
-					<li>trim mappers for out of range chunks (now development) </li>
+					<li>void setup()内で TaggedInputSplit inputSplit が呼ばれる</li>
+					<li>inputSplit.getMapperClass() で、 mapper が Reflection される</li>
+					<li>map task が走る</li>
 				</ul>
 			</section>
 			
 			<section class="slide">
 				<h2>宣伝</h2>
 				<iframe style="width: 100%; height:600px;" src="http://cloud.nifty.com/feature/"></iframe>
-			</section>
-			
-			<section class="slide">
-				<h2>宣伝</h2>
-				<iframe style="width: 100%; height:600px;" src="http://tech.nifty.co.jp/party/2012/"></iframe>
 			</section>
 			
 			<section class="slide">
