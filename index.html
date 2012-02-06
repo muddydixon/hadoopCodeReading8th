@@ -25,9 +25,7 @@
 	<body>
 		<article class="deck-container">
 			<section class="slide">
-				<h1 style="text-align:left; font-size: 3.0em">
-					オレオレMultipleInputを作る方法
-				</h1>
+				<h1 style="text-align:left; font-size: 3.0em">オレオレMultipleInputを作る方法</h1>
 				<h3>
 					Hadoopソースコードリーディング 第8回<br />February 8th Tokyo, Japan
 				</h3>
@@ -56,12 +54,86 @@
 			</section>
 
 			<section class="slide">
-				<h2>コンテンツ</h2>
+				<h1>結論</h1>
+			</section>
+			
+			<section class="slide">
+				<h1>hadoopからmongodbを使うための<br />MongoMultipleInputを作った</h1>
+			</section>
+			
+			<section class="slide">
+				<h2>今日の関係者</h2>
+				<h3>Hadoop側</h3>
 				<ul>
-					<li>Delegateの時のmapReduce</li>
+					<li>org.apache.hadoop.mapreduce.lib.input.TaggedInputSplit</li>
+					<li>org.apache.hadoop.mapreduce.lib.input.DelegatingMapper</li>
+					<li>org.apache.hadoop.mapreduce.lib.input.DelegatingInputFormat</li>
+				</ul>
+				<h3>オレオレ側</h3>
+				<ul>
+					<li>com.mongodb.hadoop.MongoMultipleInputs</li>
+					<li>com.mongodb.hadoop.input.DelegatingInputFormat</li>
+					<li>org.apache.hadoop.mapreduce.lib.input.TaggedInputSplitGenerator</li>
 				</ul>
 			</section>
 			
+			<section class="slide">
+				<h2>オレオレ側</h2>
+				<ul>
+					<li>com.mongodb.hadoop.MongoMultipleInputs
+						<p style="font-size: 0.6em;">MongoMultipleInputs.addInputPath(job, uri, inputformat, mapper, [query, [fields, [sort, [limit, [skip]]]]]) <br />
+							気さくに使いたい
+						</p>
+					</li>
+					<li>com.mongodb.hadoop.input.DelegatingInputFormat
+						<p style="font-size: 0.6em;">DelegatingInputが「&lt;inputUri, mapper&gt;」のペアでsplitを作れないので作り直し</p>
+					</li>
+					<li>org.apache.hadoop.mapreduce.lib.input.TaggedInputSplitGenerator
+						<p style="font-size: 0.6em;">org.apache.hadoop.mapreduce.lib.input.TaggedInputSplitがpublicなclassでなく、DelegatingInputFormatから利用できないのでバイパス<br />
+							誰かpublicじゃない理由を知っている人は教えてください &gt;&nbsp;&lt;
+							<img style="margin:0;" src="./images/shoudbepublic.png" />
+						</p>
+					</li>
+				</ul>
+			</section>
+			
+			<section class="slide">
+				<h2>hadoop側</h2>
+				<ul>
+					<li>org.apache.hadoop.mapreduce.lib.input.TaggedInputSplit
+						<p style="font-size: 0.6em;">An {@link InputSplit} that tags another InputSplit with extra data for use by {@link DelegatingInputFormat}s and {@link DelegatingMapper}s.</p>
+					</li>
+					<li>org.apache.hadoop.mapreduce.lib.input.DelegatingMapper
+						<p style="font-size: 0.6em;">An {@link Mapper} that delegates behavior of paths to multiple other mappers.</p>
+					</li>
+					<li>org.apache.hadoop.mapreduce.lib.input.DelegatingInputFormat
+						<p style="font-size: 0.6em;">An {@link InputFormat} that delegates behavior of paths to multiple other InputFormats.</p>
+					</li>
+				</ul>
+			</section>
+			
+			<section class="slide">
+				<h2>こんな風に使いたい</h2>
+				<pre class="sh_java">MongoConfigUtil.setOutputURI( conf, "mongodb://localhost:27017/multiple.myout");
+Job job = new Job(conf, "multipleJob");
+
+MongoMultipleInputs.addInputPath(job, "mongodb://localhost:27017/multiple.in1", MongoInputFormat.class, MultipleMapper.class, "{name: {$lte: 10}}");
+MongoMultipleInputs.addInputPath(job, "mongodb://localhost:27017/multiple.in2", MongoInputFormat.class, MultipleMapper2.class, "{name: {$gt:10, $lte: 20}}");
+MongoMultipleInputs.addInputPath(job, "mongodb://localhost:27017/multiple.in3", MongoInputFormat.class, MultipleMapper3.class);
+
+log.info(job.getConfiguration().get("mongo.input.request"));
+job.setJarByClass(MultipleDriver.class);
+
+job.setReducerClass( MultipleReducer.class );
+
+job.setOutputFormatClass( MongoOutputFormat.class );
+
+job.setMapOutputKeyClass( BSONWritable.class );
+job.setMapOutputValueClass( BSONWritable.class );
+
+job.setOutputKeyClass( BSONWritable.class );
+job.setOutputValueClass( BSONWritable.class );</pre>
+			</section>
 			<section class="slide">
 				<h2>Delegateの時のmapReduce (1) 準備</h2>
 				<p>Driver内で下記をセット</p>
