@@ -73,6 +73,7 @@
 				<ul>
 					<li>com.mongodb.hadoop.MongoMultipleInputs</li>
 					<li>com.mongodb.hadoop.input.DelegatingInputFormat</li>
+					<li>com.mongodb.hadoop.util.MongoRequest</li>
 					<li>org.apache.hadoop.mapreduce.lib.input.TaggedInputSplitGenerator</li>
 				</ul>
 			</section>
@@ -94,6 +95,9 @@
 							<img style="margin:0;" src="./images/shoudbepublic.png" />
 						</p>
 					</li>
+					<li>com.mongodb.hadoop.util.MongoRequest
+						<p style="font-size: 0.6em;">uriのみを管理していた、MongoURIを拡張してそもそもリクエストの際の情報を保持するようにする</p>
+					</li>
 				</ul>
 			</section>
 			
@@ -101,7 +105,10 @@
 				<h2>hadoop側</h2>
 				<ul>
 					<li>org.apache.hadoop.mapreduce.lib.input.TaggedInputSplit
-						<p style="font-size: 0.6em;">An {@link InputSplit} that tags another InputSplit with extra data for use by {@link DelegatingInputFormat}s and {@link DelegatingMapper}s.</p>
+						<p style="font-size: 0.6em;">An {@link InputSplit} that tags another InputSplit with extra data for use by {@link DelegatingInputFormat}s and {@link DelegatingMapper}s.
+						<br>
+						
+						</p>
 					</li>
 					<li>org.apache.hadoop.mapreduce.lib.input.DelegatingMapper
 						<p style="font-size: 0.6em;">An {@link Mapper} that delegates behavior of paths to multiple other mappers.</p>
@@ -114,14 +121,17 @@
 			
 			<section class="slide">
 				<h2>こんな風に使いたい</h2>
-				<pre class="sh_java">MongoConfigUtil.setOutputURI( conf, "mongodb://localhost:27017/multiple.myout");
+				<pre class="sh_java">// Configurationを作成
+Configuration conf = this.getConf();
+// 出力先のホスト、DB、Collectionを指定
+MongoConfigUtil.setOutputURI( conf, "mongodb://localhost:27017/multiple.myout");
 Job job = new Job(conf, "multipleJob");
 
-MongoMultipleInputs.addInputPath(job, "mongodb://localhost:27017/multiple.in1", MongoInputFormat.class, MultipleMapper.class, "{name: {$lte: 10}}");
-MongoMultipleInputs.addInputPath(job, "mongodb://localhost:27017/multiple.in2", MongoInputFormat.class, MultipleMapper2.class, "{name: {$gt:10, $lte: 20}}");
-MongoMultipleInputs.addInputPath(job, "mongodb://localhost:27017/multiple.in3", MongoInputFormat.class, MultipleMapper3.class);
+// 入力元およびその際のMapper、絞り込みquery、必要なデータfieldsを複数指定
+MongoMultipleInputs.addInputPath(job, "mongodb://localhost:27017/multiple.in1", MongoInputFormat.class, MultipleMapper1.class);
+MongoMultipleInputs.addInputPath(job, "mongodb://localhost:27017/multiple.in2", MongoInputFormat.class, MultipleMapper2.class, "{name: {$lte: 10}}", "{name:1, age: 1}");
+MongoMultipleInputs.addInputPath(job, "mongodb://localhost:27017/multiple.in3", MongoInputFormat.class, MultipleMapper3.class, "{name: {$gt:10, $lte: 20}}", "{name:1, action: 1}");
 
-log.info(job.getConfiguration().get("mongo.input.request"));
 job.setJarByClass(MultipleDriver.class);
 
 job.setReducerClass( MultipleReducer.class );
@@ -134,23 +144,65 @@ job.setMapOutputValueClass( BSONWritable.class );
 job.setOutputKeyClass( BSONWritable.class );
 job.setOutputValueClass( BSONWritable.class );</pre>
 			</section>
+			
 			<section class="slide">
-				<h2>Delegateの時のmapReduce (1) 準備</h2>
-				<p>Driver内で下記をセット</p>
-				<ul>
-					<li>job.setMapperClass(DelegatingMapper.class)</li>
-					<li>job.setInputFormatClass(DelegatingInputFormat.class)</li>
-				</ul>
+				<h2>設定時の挙動</h2>
+				<h3>MongoMultipleInputs.addInputPath</h3>
+<pre class="sh_java" style="font-size: 0.8em;">MongoConfigUtil.addMongoRequest(conf, uri, inputFormatClass, mapperClass, query, fields, sort, limit, skip);
+job.setMapperClass(DelegatingMapper.class);
+ob.setInputFormatClass(DelegatingInputFormat.class);</pre>
+				<h3>MongoConfigUtil.addMongoRequest</h3>
+<pre class="sh_java" style="font-size: 0.8em;">public class MongoRequest {
+	private MongoURI mongoURI;
+	private DBObject query;
+	private DBObject fields;
+	private DBObject sort;
+	private int skip;
+	private int limit;
+	private String inputFormat;
+	private String mapper;
+	...
+}</pre>
+				<h3>com.mongodb.hadoop.input.DelegatingInputFormat</h3>
+				<p style="font-size: 1em;">
+					&lt;URI/Mapper&gt;のペアからList&lt;TaggedInputSplit extends InputSplit&gt;を生成する。mongodbの環境(sharding)にあわせて、多くのsplitを生成する
+				</p>
+				<h3>org.apache.hadoop.mapreduce.lib.input.TaggedInputSplit</h3>
+				<p style="font-size: 1em;">
+					inputSplit, conf, inputFormat, mapperというdelegatingMapperで処理を委譲するための情報を保持している
+				</p>
 			</section>
 			
 			<section class="slide">
-				<h2>Delegateの時のmapReduce (2) 起動</h2>
-				<p>MapTask内でmapperとしてDelegatingMapper.classが呼ばれる
+				<h2>Delegateの時のmapReduce</h2>
+				<h3>MapTask内でmapperとしてDelegatingMapper.classが呼ばれる</h3>
 				<ul>
 					<li>void setup()内で TaggedInputSplit inputSplit が呼ばれる</li>
 					<li>inputSplit.getMapperClass() で、 mapper が Reflection される</li>
 					<li>map task が走る</li>
 				</ul>
+<pre class="sh_java">protected void setup(Context context) throws IOException, InterruptedException {
+  // Find the Mapper from the TaggedInputSplit.
+  TaggedInputSplit inputSplit = (TaggedInputSplit) context.getInputSplit();
+  mapper = (Mapper<K1, V1, K2, V2>) ReflectionUtils.newInstance(inputSplit.getMapperClass(), context.getConfiguration());
+}</pre>
+			</section>
+			
+			<section class="slide">
+				<h2>フローのリンク</h2>
+				<h3>入力の登録〜splitsの生成</h3>
+				<ol style="font-size: 1.2em">
+					<li>com.mongodb.hadoop.input.MongoMultipleInputs&#35;addInputPath <a href="http://bit.ly/zCDLtN">http://bit.ly/zCDLtN</a></li>
+					<li>com.mongodb.hadoop.util.MongoRequest <a href="http://bit.ly/xM2q0W">http://bit.ly/xM2q0W</a></li>
+					<li><s>org.apache.hadoop.mapreduce.lib.input.DelegatingInputFormat <a href="http://bit.ly/zgTRoD">http://bit.ly/zgTRoD</a></s></li>
+					<li>com.mongodb.hadoop.input.DelegatingInputFormat <a href="http://bit.ly/zPFx6Z">http://bit.ly/zPFx6Z</a></li>
+					<li>com.mongodb.hadoop.MongoInputFormat&#35;getSplits <a href="http://bit.ly/zVB2Oc">http://bit.ly/zVB2Oc</a></li>
+					<li>com.mongodb.hadoop.util.MongoSplitter&#35;calculateSplites <a href="http://bit.ly/yHYIhN">http://bit.ly/yHYIhN</a></li>
+				</ol>
+				<h3>実際の処理</h3>
+				<ol style="font-size: 1.2em">
+					<li>org.apache.hadoop.mapreduce.lib.input.DelegatingMapper&#35;setup <a href="http://bit.ly/y839E9">http://bit.ly/y839E9</a></li>
+				</ol>
 			</section>
 			
 			<section class="slide">
